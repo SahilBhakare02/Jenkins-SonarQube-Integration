@@ -159,47 +159,33 @@ http://<jenkins-server-ip>:8080/restart
 ```groovy
 pipeline {
     agent any
-
-    tools {
-        maven 'Maven-3'   // configure this name under Manage Jenkins > Tools
-        jdk 'JDK-17'      // configure this name under Manage Jenkins > Tools
-    }
-
-    environment {
-        SONAR_ENV = 'Sonar-env'
-    }
-
     stages {
-        stage('Checkout') {
+        stage('pull') {
             steps {
-                git branch: 'main', url: '<your-repo-url>'
+                git branch: 'main', url: 'https://github.com/Rohit-1920/EasyCRUD-Updated.git'
             }
         }
-
-        stage('Build') {
+        stage('build') {
             steps {
-                sh 'mvn clean package'
+                sh '''cd backend
+                    mvn clean package -DskipTests'''
             }
         }
-
-        stage('SonarQube Analysis') {
+        stage('test') {
             steps {
-                withSonarQubeEnv("${SONAR_ENV}") {
-                    sh '''
-                        mvn clean verify sonar:sonar \
-                          -Dsonar.projectKey=studentapp \
-                          -Dsonar.projectName=studentapp \
-                          -Dsonar.host.url=$SONAR_HOST_URL \
-                          -Dsonar.token=$SONAR_AUTH_TOKEN
-                    '''
+                withSonarQubeEnv(credentialsId: 'sonar-token', installationName: 'Sonar-env'){
+                    sh '''cd backend
+                        mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \\
+                        -Dsonar.projectKey=studentapp \\
+                        -Dsonar.projectName=studentapp'''
                 }
             }
         }
-
+        
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true, credentialsId: 'sonar-token'
                 }
             }
         }
